@@ -1493,6 +1493,7 @@ async def chat_image_generation_handler(request: Request, form_data: dict, extra
     is_channel_chat = chat_id.startswith('channel:')
     image_metadata = {
         'message_id': metadata.get('message_id', None),
+        'terminal_id': metadata.get('terminal_id', None),
         **({'channel_id': chat_id.removeprefix('channel:')} if is_channel_chat else {'chat_id': chat_id}),
     }
 
