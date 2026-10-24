@@ -27,8 +27,7 @@ def test_build_openrouter_headers():
     headers = build_openrouter_headers('sk-test')
     assert headers['Authorization'] == 'Bearer sk-test'
     assert headers['Content-Type'] == 'application/json'
-    assert headers['HTTP-Referer'] == 'https://openwebui.com/'
-    assert headers['X-Title'] == 'Open WebUI'
+    assert headers['X-Title'] == 'Open WebUI Image Generation'
 
 
 def test_openrouter_request_size():
@@ -40,9 +39,7 @@ def test_openrouter_request_size():
 
 
 def test_build_openrouter_generation_payload():
-    payload = build_openrouter_generation_payload(
-        'openai/gpt-image-1', 'a cat', 1, '1024x1024', {'quality': 'high'}
-    )
+    payload = build_openrouter_generation_payload('openai/gpt-image-1', 'a cat', 1, '1024x1024', {'quality': 'high'})
     assert payload == {
         'model': 'openai/gpt-image-1',
         'prompt': 'a cat',
@@ -69,9 +66,7 @@ def test_generation_payload_params_override_size():
 
 def test_edit_payload_single_image():
     payload = build_openrouter_edit_payload('m', 'p', None, None, None, 'data:image/png;base64,AAA')
-    assert payload['input_references'] == [
-        {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,AAA'}}
-    ]
+    assert payload['input_references'] == [{'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,AAA'}}]
     assert 'n' not in payload
 
 
@@ -207,15 +202,12 @@ async def test_get_image_model_openrouter_unset_raises(fake_io, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_image_generations_openrouter_posts_to_images_endpoint(fake_io):
-    result = await images_module.image_generations(
-        request=None, form_data=CreateImageForm(prompt='a cat'), user=None
-    )
+    result = await images_module.image_generations(request=None, form_data=CreateImageForm(prompt='a cat'), user=None)
     assert len(fake_io.session.posts) == 1
     post = fake_io.session.posts[0]
     assert post['url'] == 'https://openrouter.ai/api/v1/images'
     assert post['headers']['Authorization'] == 'Bearer sk-test'
-    assert post['headers']['HTTP-Referer'] == 'https://openwebui.com/'
-    assert post['headers']['X-Title'] == 'Open WebUI'
+    assert post['headers']['X-Title'] == 'Open WebUI Image Generation'
     assert post['json'] == {'model': 'openai/gpt-image-1', 'prompt': 'a cat', 'n': 1, 'size': '1024x1024'}
     assert result == [{'id': 'file-1', 'url': '/api/v1/files/file-1/content', 'name': 'x', 'content_type': 'image/png'}]
 
@@ -224,9 +216,7 @@ async def test_image_generations_openrouter_posts_to_images_endpoint(fake_io):
 async def test_image_generations_openrouter_requires_model(fake_io):
     fake_io.config.IMAGE_GENERATION_MODEL = ''
     with pytest.raises(HTTPException) as exc_info:
-        await images_module.image_generations(
-            request=None, form_data=CreateImageForm(prompt='a cat'), user=None
-        )
+        await images_module.image_generations(request=None, form_data=CreateImageForm(prompt='a cat'), user=None)
     assert exc_info.value.status_code == 400
 
 

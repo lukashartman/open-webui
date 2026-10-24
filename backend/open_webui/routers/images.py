@@ -180,8 +180,7 @@ def build_openrouter_headers(api_key: str) -> dict:
     return {
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://openwebui.com/',
-        'X-Title': 'Open WebUI',
+        'X-Title': 'Open WebUI Image Generation',
     }
 
 
@@ -217,9 +216,7 @@ def build_openrouter_edit_payload(
 ) -> dict:
     payload = build_openrouter_generation_payload(model, prompt, n, size, params)
     images = [image] if isinstance(image, str) else image
-    payload['input_references'] = [
-        {'type': 'image_url', 'image_url': {'url': img}} for img in images
-    ]
+    payload['input_references'] = [{'type': 'image_url', 'image_url': {'url': img}} for img in images]
     return payload
 
 
