@@ -31,7 +31,7 @@
 	let loading = false;
 
 	let models = null;
-	let config = null;
+	let config: any = null;
 	const inputClass =
 		'w-full h-7 rounded-lg border border-gray-100/50 bg-gray-50/40 px-2 text-xs text-gray-700 outline-hidden transition-colors placeholder:text-gray-300 focus:border-blue-400 dark:border-white/[0.04] dark:bg-white/[0.03] dark:text-gray-300 dark:placeholder:text-gray-700 dark:focus:border-blue-500';
 	const textareaClass =
@@ -130,6 +130,12 @@
 			) {
 				toast.error($i18n.t('Gemini API Key is required.'));
 				return null;
+			} else if (
+				config.IMAGE_GENERATION_ENGINE === 'openrouter' &&
+				config.IMAGES_OPENROUTER_API_KEY === ''
+			) {
+				toast.error($i18n.t('OpenRouter API Key is required.'));
+				return null;
 			}
 		}
 
@@ -143,6 +149,16 @@
 				typeof config.IMAGES_OPENAI_API_PARAMS === 'string' &&
 				config.IMAGES_OPENAI_API_PARAMS.trim() !== ''
 					? JSON.parse(config.IMAGES_OPENAI_API_PARAMS)
+					: {},
+			IMAGES_OPENROUTER_API_PARAMS:
+				typeof config.IMAGES_OPENROUTER_API_PARAMS === 'string' &&
+				config.IMAGES_OPENROUTER_API_PARAMS.trim() !== ''
+					? JSON.parse(config.IMAGES_OPENROUTER_API_PARAMS)
+					: {},
+			IMAGES_EDIT_OPENROUTER_API_PARAMS:
+				typeof config.IMAGES_EDIT_OPENROUTER_API_PARAMS === 'string' &&
+				config.IMAGES_EDIT_OPENROUTER_API_PARAMS.trim() !== ''
+					? JSON.parse(config.IMAGES_EDIT_OPENROUTER_API_PARAMS)
 					: {}
 		}).catch((error) => {
 			toast.error(`${error}`);
@@ -180,6 +196,26 @@
 			typeof config?.IMAGES_OPENAI_API_PARAMS === 'string' &&
 			config.IMAGES_OPENAI_API_PARAMS.trim() !== '' &&
 			!validateJSON(config.IMAGES_OPENAI_API_PARAMS)
+		) {
+			toast.error($i18n.t('Invalid JSON format for Parameters'));
+			loading = false;
+			return;
+		}
+
+		if (
+			typeof config?.IMAGES_OPENROUTER_API_PARAMS === 'string' &&
+			config.IMAGES_OPENROUTER_API_PARAMS.trim() !== '' &&
+			!validateJSON(config.IMAGES_OPENROUTER_API_PARAMS)
+		) {
+			toast.error($i18n.t('Invalid JSON format for Parameters'));
+			loading = false;
+			return;
+		}
+
+		if (
+			typeof config?.IMAGES_EDIT_OPENROUTER_API_PARAMS === 'string' &&
+			config.IMAGES_EDIT_OPENROUTER_API_PARAMS.trim() !== '' &&
+			!validateJSON(config.IMAGES_EDIT_OPENROUTER_API_PARAMS)
 		) {
 			toast.error($i18n.t('Invalid JSON format for Parameters'));
 			loading = false;
@@ -293,6 +329,16 @@
 					? JSON.stringify(config.IMAGES_OPENAI_API_PARAMS ?? {}, null, 2)
 					: config.IMAGES_OPENAI_API_PARAMS;
 
+			config.IMAGES_OPENROUTER_API_PARAMS =
+				typeof config.IMAGES_OPENROUTER_API_PARAMS === 'object'
+					? JSON.stringify(config.IMAGES_OPENROUTER_API_PARAMS ?? {}, null, 2)
+					: config.IMAGES_OPENROUTER_API_PARAMS;
+
+			config.IMAGES_EDIT_OPENROUTER_API_PARAMS =
+				typeof config.IMAGES_EDIT_OPENROUTER_API_PARAMS === 'object'
+					? JSON.stringify(config.IMAGES_EDIT_OPENROUTER_API_PARAMS ?? {}, null, 2)
+					: config.IMAGES_EDIT_OPENROUTER_API_PARAMS;
+
 			config.AUTOMATIC1111_PARAMS =
 				typeof config.AUTOMATIC1111_PARAMS === 'object'
 					? JSON.stringify(config.AUTOMATIC1111_PARAMS ?? {}, null, 2)
@@ -349,6 +395,7 @@
 								placeholder={$i18n.t('Select Engine')}
 							>
 								<option value="openai">{$i18n.t('Default (Open AI)')}</option>
+								<option value="openrouter">{$i18n.t('OpenRouter')}</option>
 								<option value="comfyui">{$i18n.t('ComfyUI')}</option>
 								<option value="automatic1111">{$i18n.t('Automatic1111')}</option>
 								<option value="gemini">{$i18n.t('Gemini')}</option>
@@ -446,6 +493,77 @@
 								<Textarea
 									className={textareaClass}
 									bind:value={config.IMAGES_OPENAI_API_PARAMS}
+									placeholder={$i18n.t('Enter additional parameters in JSON format')}
+									minSize={100}
+								/>
+							</AdminSettingField>
+						{:else if config?.IMAGE_GENERATION_ENGINE === 'openrouter'}
+							<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+								<AdminSettingField
+									label={$i18n.t('settings.admin.images.imagesOpenrouterApiBaseUrl.label')}
+								>
+									<div class="flex w-full gap-2">
+										<input
+											class={inputClass}
+											placeholder={$i18n.t('https://openrouter.ai/api/v1')}
+											bind:value={config.IMAGES_OPENROUTER_API_BASE_URL}
+										/>
+										<button
+											class="shrink-0 text-gray-400 transition-colors hover:text-gray-900 dark:text-gray-600 dark:hover:text-white"
+											type="button"
+											aria-label={$i18n.t('settings.admin.images.verifyConnection.label')}
+											on:click={async () => {
+												const res = await verifyConnection(localStorage.token, {
+													engine: 'openrouter',
+													url: config.IMAGES_OPENROUTER_API_BASE_URL,
+													key: config.IMAGES_OPENROUTER_API_KEY
+												}).catch((error) => {
+													toast.error(`${error}`);
+													return null;
+												});
+
+												if (res) {
+													toast.success(
+														$i18n.t('settings.admin.images.serverConnectionVerified.label')
+													);
+												}
+											}}
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												viewBox="0 0 20 20"
+												fill="currentColor"
+												class="w-4 h-4"
+											>
+												<path
+													fill-rule="evenodd"
+													d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z"
+													clip-rule="evenodd"
+												/>
+											</svg>
+										</button>
+									</div>
+								</AdminSettingField>
+
+								<AdminSettingField
+									label={$i18n.t('settings.admin.images.imagesOpenrouterApiKey.label')}
+								>
+									<SensitiveInput
+										variant="settings"
+										placeholder={$i18n.t('settings.admin.images.imagesOpenrouterApiKey.label')}
+										bind:value={config.IMAGES_OPENROUTER_API_KEY}
+										required={false}
+									/>
+								</AdminSettingField>
+							</div>
+
+							<AdminSettingField
+								label={$i18n.t('settings.admin.images.imagesOpenrouterApiParams.label')}
+								description={$i18n.t('settings.admin.images.imagesOpenrouterApiParams.description')}
+							>
+								<Textarea
+									className={textareaClass}
+									bind:value={config.IMAGES_OPENROUTER_API_PARAMS}
 									placeholder={$i18n.t('Enter additional parameters in JSON format')}
 									minSize={100}
 								/>
@@ -775,6 +893,7 @@
 								placeholder={$i18n.t('Select Engine')}
 							>
 								<option value="openai">{$i18n.t('Default (Open AI)')}</option>
+								<option value="openrouter">{$i18n.t('OpenRouter')}</option>
 								<option value="comfyui">{$i18n.t('ComfyUI')}</option>
 								<option value="gemini">{$i18n.t('Gemini')}</option>
 							</SettingsSelect>
@@ -838,6 +957,79 @@
 									class={inputClass}
 									placeholder={$i18n.t('settings.admin.images.imagesEditOpenaiApiVersion.label')}
 									bind:value={config.IMAGES_EDIT_OPENAI_API_VERSION}
+								/>
+							</AdminSettingField>
+						{:else if config?.IMAGE_EDIT_ENGINE === 'openrouter'}
+							<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+								<AdminSettingField
+									label={$i18n.t('settings.admin.images.imagesEditOpenrouterApiBaseUrl.label')}
+								>
+									<div class="flex w-full gap-2">
+										<input
+											class={inputClass}
+											placeholder={$i18n.t('https://openrouter.ai/api/v1')}
+											bind:value={config.IMAGES_EDIT_OPENROUTER_API_BASE_URL}
+										/>
+										<button
+											class="shrink-0 text-gray-400 transition-colors hover:text-gray-900 dark:text-gray-600 dark:hover:text-white"
+											type="button"
+											aria-label={$i18n.t('settings.admin.images.verifyConnection.label')}
+											on:click={async () => {
+												const res = await verifyConnection(localStorage.token, {
+													engine: 'openrouter',
+													url: config.IMAGES_EDIT_OPENROUTER_API_BASE_URL,
+													key: config.IMAGES_EDIT_OPENROUTER_API_KEY
+												}).catch((error) => {
+													toast.error(`${error}`);
+													return null;
+												});
+
+												if (res) {
+													toast.success(
+														$i18n.t('settings.admin.images.serverConnectionVerified.label')
+													);
+												}
+											}}
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												viewBox="0 0 20 20"
+												fill="currentColor"
+												class="w-4 h-4"
+											>
+												<path
+													fill-rule="evenodd"
+													d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z"
+													clip-rule="evenodd"
+												/>
+											</svg>
+										</button>
+									</div>
+								</AdminSettingField>
+
+								<AdminSettingField
+									label={$i18n.t('settings.admin.images.imagesEditOpenrouterApiKey.label')}
+								>
+									<SensitiveInput
+										variant="settings"
+										placeholder={$i18n.t('settings.admin.images.imagesEditOpenrouterApiKey.label')}
+										bind:value={config.IMAGES_EDIT_OPENROUTER_API_KEY}
+										required={false}
+									/>
+								</AdminSettingField>
+							</div>
+
+							<AdminSettingField
+								label={$i18n.t('settings.admin.images.imagesEditOpenrouterApiParams.label')}
+								description={$i18n.t(
+									'settings.admin.images.imagesEditOpenrouterApiParams.description'
+								)}
+							>
+								<Textarea
+									className={textareaClass}
+									bind:value={config.IMAGES_EDIT_OPENROUTER_API_PARAMS}
+									placeholder={$i18n.t('Enter additional parameters in JSON format')}
+									minSize={100}
 								/>
 							</AdminSettingField>
 						{:else if config?.IMAGE_EDIT_ENGINE === 'comfyui'}
