@@ -1531,6 +1531,18 @@ IMAGES_GEMINI_API_KEY = os.getenv('IMAGES_GEMINI_API_KEY', GEMINI_API_KEY)
 
 IMAGES_GEMINI_ENDPOINT_METHOD = os.getenv('IMAGES_GEMINI_ENDPOINT_METHOD', '')
 
+IMAGES_OPENROUTER_API_BASE_URL = os.getenv('IMAGES_OPENROUTER_API_BASE_URL', 'https://openrouter.ai/api/v1')
+IMAGES_OPENROUTER_API_KEY = os.getenv('IMAGES_OPENROUTER_API_KEY', '')
+
+images_openrouter_params = os.getenv('IMAGES_OPENROUTER_API_PARAMS', '')
+try:
+    images_openrouter_params = JSONCodec.loads(images_openrouter_params)
+except JSONCodec.JSONDecodeError:
+    images_openrouter_params = {}
+
+
+IMAGES_OPENROUTER_API_PARAMS = images_openrouter_params
+
 ENABLE_IMAGE_EDIT = os.getenv('ENABLE_IMAGE_EDIT', '').lower() == 'true'
 
 IMAGE_EDIT_ENGINE = os.getenv('IMAGE_EDIT_ENGINE', 'openai')
@@ -1545,6 +1557,18 @@ IMAGES_EDIT_OPENAI_API_BASE_URL = os.getenv('IMAGES_EDIT_OPENAI_API_BASE_URL', O
 IMAGES_EDIT_OPENAI_API_VERSION = os.getenv('IMAGES_EDIT_OPENAI_API_VERSION', '')
 
 IMAGES_EDIT_OPENAI_API_KEY = os.getenv('IMAGES_EDIT_OPENAI_API_KEY', OPENAI_API_KEY)
+
+IMAGES_EDIT_OPENROUTER_API_BASE_URL = os.getenv('IMAGES_EDIT_OPENROUTER_API_BASE_URL', 'https://openrouter.ai/api/v1')
+IMAGES_EDIT_OPENROUTER_API_KEY = os.getenv('IMAGES_EDIT_OPENROUTER_API_KEY', '')
+
+images_edit_openrouter_params = os.getenv('IMAGES_EDIT_OPENROUTER_API_PARAMS', '')
+try:
+    images_edit_openrouter_params = JSONCodec.loads(images_edit_openrouter_params)
+except JSONCodec.JSONDecodeError:
+    images_edit_openrouter_params = {}
+
+
+IMAGES_EDIT_OPENROUTER_API_PARAMS = images_edit_openrouter_params
 
 IMAGES_EDIT_GEMINI_API_BASE_URL = os.getenv('IMAGES_EDIT_GEMINI_API_BASE_URL', GEMINI_API_BASE_URL)
 IMAGES_EDIT_GEMINI_API_KEY = os.getenv('IMAGES_EDIT_GEMINI_API_KEY', GEMINI_API_KEY)
@@ -3116,6 +3140,9 @@ DEFAULT_CONFIG = {
     'image_generation.openai.api_version': IMAGES_OPENAI_API_VERSION,
     'image_generation.openai.api_key': IMAGES_OPENAI_API_KEY,
     'image_generation.openai.params': IMAGES_OPENAI_API_PARAMS,
+    'image_generation.openrouter.api_base_url': IMAGES_OPENROUTER_API_BASE_URL,
+    'image_generation.openrouter.api_key': IMAGES_OPENROUTER_API_KEY,
+    'image_generation.openrouter.params': IMAGES_OPENROUTER_API_PARAMS,
     'image_generation.gemini.api_base_url': IMAGES_GEMINI_API_BASE_URL,
     'image_generation.gemini.api_key': IMAGES_GEMINI_API_KEY,
     'image_generation.gemini.endpoint_method': IMAGES_GEMINI_ENDPOINT_METHOD,
@@ -3126,6 +3153,9 @@ DEFAULT_CONFIG = {
     'images.edit.openai.api_base_url': IMAGES_EDIT_OPENAI_API_BASE_URL,
     'images.edit.openai.api_version': IMAGES_EDIT_OPENAI_API_VERSION,
     'images.edit.openai.api_key': IMAGES_EDIT_OPENAI_API_KEY,
+    'images.edit.openrouter.api_base_url': IMAGES_EDIT_OPENROUTER_API_BASE_URL,
+    'images.edit.openrouter.api_key': IMAGES_EDIT_OPENROUTER_API_KEY,
+    'images.edit.openrouter.params': IMAGES_EDIT_OPENROUTER_API_PARAMS,
     'images.edit.gemini.api_base_url': IMAGES_EDIT_GEMINI_API_BASE_URL,
     'images.edit.gemini.api_key': IMAGES_EDIT_GEMINI_API_KEY,
     'images.edit.comfyui.base_url': IMAGES_EDIT_COMFYUI_BASE_URL,

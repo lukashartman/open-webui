@@ -94,3 +94,23 @@ async def test_decode_openrouter_image_sniffs_when_media_type_missing():
     data, content_type = await decode_openrouter_image({'b64_json': _png_b64()})
     assert content_type == 'image/png'
     assert data[:8] == b'\x89PNG\r\n\x1a\n'
+
+
+def test_openrouter_config_keys_are_registered():
+    from open_webui.config import DEFAULT_CONFIG
+    from open_webui.models.config import DICT_CONFIG_KEY_ALIASES
+    from open_webui.routers.images import IMAGE_CONFIG_KEYS
+
+    expected_storage_keys = {
+        'IMAGES_OPENROUTER_API_BASE_URL': 'image_generation.openrouter.api_base_url',
+        'IMAGES_OPENROUTER_API_KEY': 'image_generation.openrouter.api_key',
+        'IMAGES_OPENROUTER_API_PARAMS': 'image_generation.openrouter.params',
+        'IMAGES_EDIT_OPENROUTER_API_BASE_URL': 'images.edit.openrouter.api_base_url',
+        'IMAGES_EDIT_OPENROUTER_API_KEY': 'images.edit.openrouter.api_key',
+        'IMAGES_EDIT_OPENROUTER_API_PARAMS': 'images.edit.openrouter.params',
+    }
+    for field, storage_key in expected_storage_keys.items():
+        assert IMAGE_CONFIG_KEYS[field] == storage_key
+        assert storage_key in DEFAULT_CONFIG
+    assert DICT_CONFIG_KEY_ALIASES['image_generation.openrouter.params'] == ('IMAGES_OPENROUTER_API_PARAMS',)
+    assert DICT_CONFIG_KEY_ALIASES['images.edit.openrouter.params'] == ('IMAGES_EDIT_OPENROUTER_API_PARAMS',)

@@ -76,6 +76,9 @@ IMAGE_CONFIG_KEYS = {
     'IMAGES_OPENAI_API_KEY': 'image_generation.openai.api_key',
     'IMAGES_OPENAI_API_VERSION': 'image_generation.openai.api_version',
     'IMAGES_OPENAI_API_PARAMS': 'image_generation.openai.params',
+    'IMAGES_OPENROUTER_API_BASE_URL': 'image_generation.openrouter.api_base_url',
+    'IMAGES_OPENROUTER_API_KEY': 'image_generation.openrouter.api_key',
+    'IMAGES_OPENROUTER_API_PARAMS': 'image_generation.openrouter.params',
     'AUTOMATIC1111_BASE_URL': 'image_generation.automatic1111.base_url',
     'AUTOMATIC1111_API_AUTH': 'image_generation.automatic1111.api_auth',
     'AUTOMATIC1111_PARAMS': 'image_generation.automatic1111.api_params',
@@ -93,6 +96,9 @@ IMAGE_CONFIG_KEYS = {
     'IMAGES_EDIT_OPENAI_API_BASE_URL': 'images.edit.openai.api_base_url',
     'IMAGES_EDIT_OPENAI_API_KEY': 'images.edit.openai.api_key',
     'IMAGES_EDIT_OPENAI_API_VERSION': 'images.edit.openai.api_version',
+    'IMAGES_EDIT_OPENROUTER_API_BASE_URL': 'images.edit.openrouter.api_base_url',
+    'IMAGES_EDIT_OPENROUTER_API_KEY': 'images.edit.openrouter.api_key',
+    'IMAGES_EDIT_OPENROUTER_API_PARAMS': 'images.edit.openrouter.params',
     'IMAGES_EDIT_GEMINI_API_BASE_URL': 'images.edit.gemini.api_base_url',
     'IMAGES_EDIT_GEMINI_API_KEY': 'images.edit.gemini.api_key',
     'IMAGES_EDIT_COMFYUI_BASE_URL': 'images.edit.comfyui.base_url',
@@ -294,6 +300,10 @@ class ImagesConfig(BaseModel):
     IMAGES_OPENAI_API_VERSION: str
     IMAGES_OPENAI_API_PARAMS: dict | str | None
 
+    IMAGES_OPENROUTER_API_BASE_URL: str
+    IMAGES_OPENROUTER_API_KEY: str
+    IMAGES_OPENROUTER_API_PARAMS: dict | str | None
+
     AUTOMATIC1111_BASE_URL: str
     AUTOMATIC1111_API_AUTH: dict | str | None
     AUTOMATIC1111_PARAMS: dict | str | None
@@ -315,6 +325,9 @@ class ImagesConfig(BaseModel):
     IMAGES_EDIT_OPENAI_API_BASE_URL: str
     IMAGES_EDIT_OPENAI_API_KEY: str
     IMAGES_EDIT_OPENAI_API_VERSION: str
+    IMAGES_EDIT_OPENROUTER_API_BASE_URL: str
+    IMAGES_EDIT_OPENROUTER_API_KEY: str
+    IMAGES_EDIT_OPENROUTER_API_PARAMS: dict | str | None
     IMAGES_EDIT_GEMINI_API_BASE_URL: str
     IMAGES_EDIT_GEMINI_API_KEY: str
     IMAGES_EDIT_COMFYUI_BASE_URL: str
