@@ -170,6 +170,60 @@ def get_image_file_item(base64_string, param_name='image'):
     )
 
 
+def build_openrouter_headers(api_key: str) -> dict:
+    return {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://openwebui.com/',
+        'X-Title': 'Open WebUI',
+    }
+
+
+def openrouter_request_size(size: str | None) -> str | None:
+    if size and re.fullmatch(r'\d+x\d+', size):
+        return size
+    return None
+
+
+def build_openrouter_generation_payload(
+    model: str, prompt: str, n: int | None, size: str | None, params: dict | str | None
+) -> dict:
+    payload = {'model': model, 'prompt': prompt}
+    if n is not None:
+        payload['n'] = n
+    valid_size = openrouter_request_size(size)
+    if valid_size:
+        payload['size'] = valid_size
+    if isinstance(params, str):
+        params = JSONCodec.loads(params) if params else {}
+    if params:
+        payload.update(params)
+    return payload
+
+
+def build_openrouter_edit_payload(
+    model: str,
+    prompt: str,
+    n: int | None,
+    size: str | None,
+    params: dict | str | None,
+    image: str | list[str],
+) -> dict:
+    payload = build_openrouter_generation_payload(model, prompt, n, size, params)
+    images = [image] if isinstance(image, str) else image
+    payload['input_references'] = [
+        {'type': 'image_url', 'image_url': {'url': img}} for img in images
+    ]
+    return payload
+
+
+async def decode_openrouter_image(entry: dict) -> tuple[bytes, str]:
+    media_type = entry.get('media_type')
+    if media_type:
+        return base64.b64decode(entry['b64_json']), media_type
+    return await get_image_data(entry['b64_json'])
+
+
 async def set_image_model(request: Request, model: str):
     log.info('Setting image model to %s', model)
     await Config.upsert({'image_generation.model': model})
