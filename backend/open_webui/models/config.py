@@ -30,6 +30,8 @@ DICT_CONFIG_KEY_ALIASES = {
     'web.search.linkup_search_params': ('LINKUP_SEARCH_PARAMS',),
     'image_generation.automatic1111.api_params': ('AUTOMATIC1111_PARAMS',),
     'image_generation.openai.params': ('IMAGES_OPENAI_API_PARAMS',),
+    'image_generation.openrouter.params': ('IMAGES_OPENROUTER_API_PARAMS',),
+    'images.edit.openrouter.params': ('IMAGES_EDIT_OPENROUTER_API_PARAMS',),
     'audio.tts.openai.params': ('AUDIO_TTS_OPENAI_PARAMS',),
     'audio.realtime.input_params': ('AUDIO_REALTIME_INPUT_PARAMS',),
     'models.default_metadata': ('DEFAULT_MODEL_METADATA',),
