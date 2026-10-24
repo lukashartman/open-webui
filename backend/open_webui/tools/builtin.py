@@ -456,7 +456,9 @@ async def edit_image(
     Supports targeted edits such as adding, removing, replacing, inpainting, extending, or compositing image content.
 
     :param prompt: A description of the transformation to apply to the provided images
-    :param image_urls: Source image URLs to modify or use as composition inputs
+    :param image_urls: Source image URLs to modify or use as composition inputs. Each entry must be one of:
+        the id or url value of an attached <file> tag, a /api/v1/files/{id}/content path, an http(s):// URL,
+        or a base64 data: URL. A file name alone is not a valid reference.
     :param size: Optional output size in WIDTHxHEIGHT pixels (e.g. "1536x1024"), supported by the configured image model.
         Omit to use the configured default.
     :return: Confirmation that the images were edited, or an error message

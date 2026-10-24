@@ -227,6 +227,18 @@ async def decode_openrouter_image(entry: dict) -> tuple[bytes, str]:
     return await get_image_data(entry['b64_json'])
 
 
+async def read_openrouter_response(r) -> dict:
+    """Decode an OpenRouter /images response, surfacing the API's own error body on failure.
+
+    OpenRouter returns 404 both for unknown models and unknown paths, and its JSON body says
+    which one happened; raise_for_status() alone would discard that context.
+    """
+    if r.ok:
+        return await r.json(content_type=None)
+    body = (await r.text())[:500]
+    raise HTTPException(status_code=400, detail=f'OpenRouter image API error ({r.status}): {body}')
+
+
 async def set_image_model(request: Request, model: str):
     log.info('Setting image model to %s', model)
     await Config.upsert({'image_generation.model': model})
@@ -417,7 +429,7 @@ async def verify_connection(form_data: ConnectionVerificationForm, user=Depends(
         if form_data.key:
             headers['Authorization'] = f'Bearer {form_data.key}'
     elif form_data.engine == 'openrouter':
-        url = f'{url}/images/models'
+        url = f'{url.rstrip("/")}/images/models'
         if form_data.key:
             headers['Authorization'] = f'Bearer {form_data.key}'
     else:
@@ -774,13 +786,12 @@ async def image_generations(
 
             session = await get_session()
             async with session.post(
-                url=f'{image_config.IMAGES_OPENROUTER_API_BASE_URL}/images',
+                url=f'{image_config.IMAGES_OPENROUTER_API_BASE_URL.rstrip("/")}/images',
                 json=data,
                 headers=headers,
                 ssl=AIOHTTP_CLIENT_SESSION_SSL,
             ) as r:
-                r.raise_for_status()
-                res = await r.json(content_type=None)
+                res = await read_openrouter_response(r)
 
             images = []
 
@@ -950,6 +961,8 @@ async def image_generations(
                 )
                 images.append(image_file)
             return images
+    except HTTPException:
+        raise
     except Exception as e:
         error = e
         if isinstance(e, aiohttp.ClientResponseError):
@@ -1055,12 +1068,27 @@ async def image_edits(
 
             else:
                 file_id = None
-                if data.startswith('/api/v1/files'):
+                if '/api/v1/files/' in data:
+                    # Tolerate mangled references (e.g. 'url="/api/v1/files/{id}/content"')
+                    # by extracting the file id wherever the path appears in the string.
                     file_id = data.split('/api/v1/files/')[1].split('/content')[0]
                 else:
                     file_id = data
 
-                file_response = await get_file_content_by_id(file_id, user)
+                try:
+                    file_response = await get_file_content_by_id(file_id, user)
+                except HTTPException as e:
+                    if e.status_code != 404:
+                        raise
+                    preview = data if len(data) <= 100 else f'{data[:100]}…'
+                    raise HTTPException(
+                        status_code=404,
+                        detail=(
+                            f'Image not found: "{preview}". Pass the id or url value of the '
+                            f'attached <file> tag, a /api/v1/files/{{id}}/content path, an '
+                            f'http(s) URL, or a data: URL.'
+                        ),
+                    ) from e
                 if isinstance(file_response, FileResponse):
                     file_path = file_response.path
 
@@ -1188,13 +1216,12 @@ async def image_edits(
 
             session = await get_session()
             async with session.post(
-                url=f'{image_config.IMAGES_EDIT_OPENROUTER_API_BASE_URL}/images',
+                url=f'{image_config.IMAGES_EDIT_OPENROUTER_API_BASE_URL.rstrip("/")}/images',
                 json=data,
                 headers=headers,
                 ssl=AIOHTTP_CLIENT_SESSION_SSL,
             ) as r:
-                r.raise_for_status()
-                res = await r.json(content_type=None)
+                res = await read_openrouter_response(r)
 
             images = []
 
@@ -1344,6 +1371,8 @@ async def image_edits(
                 images.append(image_file)
 
             return images
+    except HTTPException:
+        raise
     except Exception as e:
         error = e
         if isinstance(e, aiohttp.ClientResponseError):

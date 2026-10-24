@@ -2,6 +2,7 @@ import base64
 import io
 from types import SimpleNamespace
 
+import aiohttp
 import pytest
 from fastapi import HTTPException
 from open_webui.routers import images as images_module
@@ -147,31 +148,43 @@ class _PostContext:
 
 
 class _Response:
-    def __init__(self, payload):
+    def __init__(self, payload, status=200, text=None):
         self._payload = payload
+        self.status = status
+        self.ok = status < 400
+        self._text = text if text is not None else str(payload)
 
     def raise_for_status(self):
-        pass
+        if not self.ok:
+            raise aiohttp.ClientResponseError(request_info=None, history=(), status=self.status, message='Not Found')
 
     async def json(self, content_type=None):
         return self._payload
 
+    async def text(self):
+        return self._text
+
 
 class _Session:
-    def __init__(self, payload):
+    def __init__(self, payload, status=200, text=None):
         self._payload = payload
+        self._status = status
+        self._text = text
         self.posts = []
 
     def post(self, url, json=None, headers=None, ssl=None):
         self.posts.append({'url': url, 'json': json, 'headers': headers})
-        return _PostContext(_Response(self._payload))
+        return _PostContext(_Response(self._payload, status=self._status, text=self._text))
 
 
 @pytest.fixture
 def fake_io(monkeypatch):
     cfg = _openrouter_config()
     session = _Session({'data': [{'b64_json': _png_b64(), 'media_type': 'image/png'}]})
+    return _install_fake_io(monkeypatch, cfg, session)
 
+
+def _install_fake_io(monkeypatch, cfg, session):
     async def fake_get_image_config():
         return cfg
 
@@ -185,6 +198,17 @@ def fake_io(monkeypatch):
     monkeypatch.setattr(images_module, 'get_session', fake_get_session)
     monkeypatch.setattr(images_module, 'upload_image', fake_upload_image)
     return SimpleNamespace(config=cfg, session=session)
+
+
+@pytest.fixture
+def fake_io_error(monkeypatch):
+    cfg = _openrouter_config()
+    session = _Session(
+        {'data': []},
+        status=404,
+        text='{"error":{"message":"Model not found"}}',
+    )
+    return _install_fake_io(monkeypatch, cfg, session)
 
 
 @pytest.mark.asyncio
@@ -247,3 +271,74 @@ async def test_image_edits_openrouter_requires_model(fake_io):
             user=None,
         )
     assert exc_info.value.status_code == 400
+
+
+ERROR_MESSAGES_NOT_FOUND = "We could not find what you're looking for :/"
+
+
+@pytest.mark.asyncio
+async def test_image_edits_unresolvable_reference_raises_actionable_error(fake_io, monkeypatch):
+    async def fake_get_file_content_by_id(file_id, user):
+        raise HTTPException(status_code=404, detail=ERROR_MESSAGES_NOT_FOUND)
+
+    monkeypatch.setattr(images_module, 'get_file_content_by_id', fake_get_file_content_by_id)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await images_module.image_edits(
+            request=None,
+            form_data=EditImageForm(image='photo.jpg', prompt='make it blue'),
+            user=None,
+        )
+    assert exc_info.value.status_code == 404
+    detail = str(exc_info.value.detail)
+    assert 'photo.jpg' in detail
+    assert 'file' in detail
+    assert 'http' in detail
+    assert 'data:' in detail
+
+
+@pytest.mark.asyncio
+async def test_image_edits_extracts_file_id_from_embedded_file_path(fake_io, monkeypatch):
+    seen = []
+
+    async def fake_get_file_content_by_id(file_id, user):
+        seen.append(file_id)
+        raise HTTPException(status_code=404, detail=ERROR_MESSAGES_NOT_FOUND)
+
+    monkeypatch.setattr(images_module, 'get_file_content_by_id', fake_get_file_content_by_id)
+
+    with pytest.raises(HTTPException):
+        await images_module.image_edits(
+            request=None,
+            form_data=EditImageForm(image='url="/api/v1/files/abc-123/content"', prompt='make it blue'),
+            user=None,
+        )
+    assert seen == ['abc-123']
+
+
+@pytest.mark.asyncio
+async def test_openrouter_base_urls_are_normalized(fake_io):
+    fake_io.config.IMAGES_OPENROUTER_API_BASE_URL = 'https://openrouter.ai/api/v1/'
+    fake_io.config.IMAGES_EDIT_OPENROUTER_API_BASE_URL = 'https://openrouter.ai/api/v1/'
+
+    await images_module.image_generations(request=None, form_data=CreateImageForm(prompt='a cat'), user=None)
+    await images_module.image_edits(
+        request=None,
+        form_data=EditImageForm(image='data:image/png;base64,AAA', prompt='make it blue'),
+        user=None,
+    )
+    assert [post['url'] for post in fake_io.session.posts] == [
+        'https://openrouter.ai/api/v1/images',
+        'https://openrouter.ai/api/v1/images',
+    ]
+
+
+@pytest.mark.asyncio
+async def test_openrouter_upstream_error_body_is_surfaced(fake_io_error):
+    with pytest.raises(HTTPException) as exc_info:
+        await images_module.image_edits(
+            request=None,
+            form_data=EditImageForm(image='data:image/png;base64,AAA', prompt='make it blue'),
+            user=None,
+        )
+    assert 'Model not found' in str(exc_info.value)
