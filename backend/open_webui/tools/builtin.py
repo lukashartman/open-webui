@@ -457,7 +457,7 @@ async def edit_image(
 
     :param prompt: A description of the transformation to apply to the provided images
     :param image_urls: Source image URLs to modify or use as composition inputs. Each entry must be one of:
-        the id or url value of an attached <file> tag, a /api/v1/files/{id}/content path, an http(s):// URL,
+        the id or url value of an attached <file> tag (including terminal filesystem paths), a /api/v1/files/{id}/content path, an http(s):// URL,
         or a base64 data: URL. A file name alone is not a valid reference.
     :param size: Optional output size in WIDTHxHEIGHT pixels (e.g. "1536x1024"), supported by the configured image model.
         Omit to use the configured default.

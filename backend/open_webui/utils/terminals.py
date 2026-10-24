@@ -202,6 +202,75 @@ async def get_terminal_json(request, user, metadata: dict, path: str, extra_para
     return None
 
 
+async def fetch_terminal_file_bytes(request, user, metadata: dict, file_path: str) -> tuple[bytes, str] | None:
+    """Fetch raw file bytes from an admin-configured terminal server.
+
+    Unlike get_terminal_json (JSON-only), this reads the raw response body so
+    binary files such as images can be retrieved, e.g. via /files/view.
+    Returns (bytes, content_type) or None when the terminal is unavailable.
+    """
+    if not ENABLE_TOOL_SERVERS:
+        return None
+
+    import aiohttp
+    from open_webui.env import AIOHTTP_CLIENT_SESSION_TOOL_SERVER_SSL, AIOHTTP_CLIENT_TIMEOUT_TOOL_SERVER_DATA
+    from open_webui.models.config import Config
+    from open_webui.models.groups import Groups
+    from open_webui.models.users import UserModel
+    from open_webui.utils.access_control import has_connection_access
+    from open_webui.utils.tools import build_tool_server_headers
+
+    metadata = metadata or {}
+    terminal_id = metadata.get('terminal_id')
+    if not terminal_id:
+        return None
+
+    user_model = user if isinstance(user, UserModel) else UserModel(**user)
+    connections = await Config.get('terminal_server.connections', []) or []
+    connection = next((item for item in connections if item.get('id') == terminal_id), None)
+    if not connection:
+        return None
+
+    terminal_context = 'automation' if metadata.get('automation_id') else 'chat'
+    context_id = terminal_context_id(connection, metadata, terminal_context)
+    config = terminal_context_config(connection, terminal_context)
+    if (
+        not connection.get('enabled', True)
+        or not terminal_context_available(connection, terminal_context)
+        or (config.get('context_id') in {'chat_id', 'automation_id'} and not context_id)
+    ):
+        return None
+    user_group_ids = {
+        group.id for group in await Groups.get_groups_by_member_id(user_model.id, include_inherited=True)
+    }
+    if not await has_connection_access(user_model, connection, user_group_ids):
+        return None
+
+    headers, cookies = await build_tool_server_headers(
+        connection,
+        request,
+        user_model,
+        metadata=metadata,
+    )
+    headers['X-User-Id'] = user_model.id
+    if metadata.get('chat_id'):
+        headers['X-Session-Id'] = metadata['chat_id']
+    if context_id:
+        headers[TERMINAL_CONTEXT_HEADER] = context_id
+    timeout = aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT_TOOL_SERVER_DATA)
+    async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
+        async with session.get(
+            f'{get_terminal_server_url(connection)}{file_path}',
+            headers=headers,
+            cookies=cookies,
+            ssl=AIOHTTP_CLIENT_SESSION_TOOL_SERVER_SSL,
+            allow_redirects=False,
+        ) as response:
+            if response.status != 200:
+                return None
+            return await response.read(), response.headers.get('Content-Type', 'application/octet-stream')
+
+
 async def get_terminal_agents_md(request, user, metadata: dict, extra_params: dict | None = None) -> str | None:
     """Load the selected terminal user's home AGENTS.md afresh for this turn."""
     try:

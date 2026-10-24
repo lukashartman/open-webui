@@ -34,6 +34,7 @@ from open_webui.routers.files import get_file_content_by_id, upload_file_handler
 from open_webui.utils.access_control import has_permission
 from open_webui.utils.auth import get_admin_user, get_verified_user
 from open_webui.utils.headers import include_user_info_headers
+from open_webui.utils import terminals as terminals_module
 from open_webui.utils.images.comfyui import (
     ComfyUICreateImageForm,
     ComfyUIEditImageForm,
@@ -1018,6 +1019,49 @@ async def edit_images(request: Request, form_data: EditImageForm, user=Depends(g
     return result
 
 
+def _is_terminal_file_reference(data: str) -> bool:
+    """Return True when the reference looks like a terminal filesystem path.
+
+    Terminal filesystem attachments (chat_uploads: 'filesystem') carry absolute
+    POSIX/Windows paths (e.g. /home/user/image.jpg, C:\\Users\\x\\a.png), which
+    are not Open WebUI file IDs.
+    """
+    if data.startswith(('data:', 'http://', 'https://', '/api/v1/files/')):
+        return False
+    # Absolute POSIX path or Windows drive path — the form terminal uploads take
+    if data.startswith('/') or re.match(r'^[A-Za-z]:[\\/]', data):
+        return True
+    return False
+
+
+async def load_terminal_file_image(request: Request, data: str, metadata: dict, user) -> str | None:
+    """Load an image attached via an Open Terminal filesystem upload.
+
+    Fetches the raw bytes from the terminal's /files/view endpoint using the
+    terminal_id in metadata, and returns a data: URL. Returns None when the
+    reference is not terminal-resolvable (no terminal, terminal unavailable).
+    """
+    if not metadata.get('terminal_id'):
+        return None
+
+    from urllib.parse import quote
+
+    path = quote(data, safe='')
+    try:
+        result = await terminals_module.fetch_terminal_file_bytes(request, user, metadata, f'/files/view?path={path}')
+    except Exception:
+        return None
+    if result is None:
+        return None
+
+    image_bytes, content_type = result
+    if not content_type or content_type == 'application/octet-stream':
+        guessed, _ = mimetypes.guess_type(data)
+        content_type = guessed or 'image/png'
+    image_data = base64.b64encode(image_bytes).decode('utf-8')
+    return f'data:{content_type};base64,{image_data}'
+
+
 async def image_edits(
     request: Request,
     form_data: EditImageForm,
@@ -1073,6 +1117,22 @@ async def image_edits(
                     # by extracting the file id wherever the path appears in the string.
                     file_id = data.split('/api/v1/files/')[1].split('/content')[0]
                 else:
+                    # Absolute/relative paths (e.g. /home/user/image.jpg) are terminal
+                    # filesystem attachment references — the file lives on the attached
+                    # Open Terminal, not in Open WebUI storage.
+                    if _is_terminal_file_reference(data) and metadata.get('terminal_id'):
+                        terminal_image = await load_terminal_file_image(request, data, metadata, user)
+                        if terminal_image is not None:
+                            return terminal_image
+                        preview = data if len(data) <= 100 else f'{data[:100]}…'
+                        raise HTTPException(
+                            status_code=404,
+                            detail=(
+                                f'Image not found on the attached terminal: "{preview}". '
+                                f'Verify the path exists on the terminal (id or url value of '
+                                f'the attached <file> tag).'
+                            ),
+                        )
                     file_id = data
 
                 try:
@@ -1085,8 +1145,8 @@ async def image_edits(
                         status_code=404,
                         detail=(
                             f'Image not found: "{preview}". Pass the id or url value of the '
-                            f'attached <file> tag, a /api/v1/files/{{id}}/content path, an '
-                            f'http(s) URL, or a data: URL.'
+                            f'attached <file> tag (including terminal filesystem paths), a '
+                            f'/api/v1/files/{{id}}/content path, an http(s) URL, or a data: URL.'
                         ),
                     ) from e
                 if isinstance(file_response, FileResponse):
