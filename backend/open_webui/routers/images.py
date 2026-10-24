@@ -264,6 +264,10 @@ async def get_image_model(request):
     image_config = await get_image_config()
     if image_config.IMAGE_GENERATION_ENGINE == 'openai':
         return image_config.IMAGE_GENERATION_MODEL if image_config.IMAGE_GENERATION_MODEL else 'dall-e-2'
+    elif image_config.IMAGE_GENERATION_ENGINE == 'openrouter':
+        if image_config.IMAGE_GENERATION_MODEL:
+            return image_config.IMAGE_GENERATION_MODEL
+        raise HTTPException(status_code=400, detail='OpenRouter image generation model is not set')
     elif image_config.IMAGE_GENERATION_ENGINE == 'gemini':
         return image_config.IMAGE_GENERATION_MODEL if image_config.IMAGE_GENERATION_MODEL else 'imagen-3.0-generate-002'
     elif image_config.IMAGE_GENERATION_ENGINE == 'comfyui':
@@ -415,6 +419,10 @@ async def verify_connection(form_data: ConnectionVerificationForm, user=Depends(
         url = f'{url}/object_info'
         if form_data.key:
             headers['Authorization'] = f'Bearer {form_data.key}'
+    elif form_data.engine == 'openrouter':
+        url = f'{url}/images/models'
+        if form_data.key:
+            headers['Authorization'] = f'Bearer {form_data.key}'
     else:
         raise HTTPException(status_code=400, detail='Unsupported image engine')
 
@@ -438,6 +446,8 @@ async def get_models(request: Request, user=Depends(get_verified_user)):
                 {'id': 'gpt-image-1', 'name': 'GPT-IMAGE 1'},
                 {'id': 'gpt-image-1.5', 'name': 'GPT-IMAGE 1.5'},
             ]
+        elif image_config.IMAGE_GENERATION_ENGINE == 'openrouter':
+            return []
         elif image_config.IMAGE_GENERATION_ENGINE == 'gemini':
             return [
                 {'id': 'imagen-3.0-generate-002', 'name': 'imagen-3.0 generate-002'},
@@ -747,6 +757,38 @@ async def image_generations(
                 else:
                     image_data, content_type = await get_image_data(image['b64_json'])
 
+                _, image_file = await upload_image(request, image_data, content_type, {**data, **metadata}, user)
+                images.append(image_file)
+            return images
+
+        elif image_config.IMAGE_GENERATION_ENGINE == 'openrouter':
+            headers = build_openrouter_headers(image_config.IMAGES_OPENROUTER_API_KEY)
+
+            if ENABLE_FORWARD_USER_INFO_HEADERS:
+                headers = include_user_info_headers(headers, user)
+
+            data = build_openrouter_generation_payload(
+                model,
+                form_data.prompt,
+                form_data.n,
+                form_data.size or image_config.IMAGE_SIZE,
+                image_config.IMAGES_OPENROUTER_API_PARAMS,
+            )
+
+            session = await get_session()
+            async with session.post(
+                url=f'{image_config.IMAGES_OPENROUTER_API_BASE_URL}/images',
+                json=data,
+                headers=headers,
+                ssl=AIOHTTP_CLIENT_SESSION_SSL,
+            ) as r:
+                r.raise_for_status()
+                res = await r.json(content_type=None)
+
+            images = []
+
+            for entry in res['data']:
+                image_data, content_type = await decode_openrouter_image(entry)
                 _, image_file = await upload_image(request, image_data, content_type, {**data, **metadata}, user)
                 images.append(image_file)
             return images
@@ -1125,6 +1167,42 @@ async def image_edits(
                 else:
                     image_data, content_type = await get_image_data(image['b64_json'])
 
+                _, image_file = await upload_image(request, image_data, content_type, {**data, **metadata}, user)
+                images.append(image_file)
+            return images
+
+        elif image_config.IMAGE_EDIT_ENGINE == 'openrouter':
+            if not model:
+                raise HTTPException(status_code=400, detail='OpenRouter image edit model is not set')
+
+            headers = build_openrouter_headers(image_config.IMAGES_EDIT_OPENROUTER_API_KEY)
+
+            if ENABLE_FORWARD_USER_INFO_HEADERS:
+                headers = include_user_info_headers(headers, user)
+
+            data = build_openrouter_edit_payload(
+                model,
+                form_data.prompt,
+                form_data.n,
+                size,
+                image_config.IMAGES_EDIT_OPENROUTER_API_PARAMS,
+                form_data.image,
+            )
+
+            session = await get_session()
+            async with session.post(
+                url=f'{image_config.IMAGES_EDIT_OPENROUTER_API_BASE_URL}/images',
+                json=data,
+                headers=headers,
+                ssl=AIOHTTP_CLIENT_SESSION_SSL,
+            ) as r:
+                r.raise_for_status()
+                res = await r.json(content_type=None)
+
+            images = []
+
+            for entry in res['data']:
+                image_data, content_type = await decode_openrouter_image(entry)
                 _, image_file = await upload_image(request, image_data, content_type, {**data, **metadata}, user)
                 images.append(image_file)
             return images
